@@ -6,10 +6,13 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using MindCave.Backend.Data;
+using MindCave.Backend.Repositories;
+using MindCave.Backend.Services;
 using System;
 using System.Text.Json.Serialization;
 using System.Text;
 using Microsoft.OpenApi.Models;
+using System.Threading.Tasks;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +22,19 @@ builder.Services.AddControllers()
     {
         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
     });
+
+// Database Developer Page Exception Filter ekle
+builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+
+// Repository ve Service katmanlarını ekle
+builder.Services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<INoteRepository, NoteRepository>();
+builder.Services.AddScoped<IWorkspaceRepository, WorkspaceRepository>();
+
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<INoteService, NoteService>();
+builder.Services.AddScoped<IWorkspaceService, WorkspaceService>();
 
 // Swagger yapılandırması
 builder.Services.AddEndpointsApiExplorer();
@@ -52,16 +68,16 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// CORS yapılandırması - Frontend için güncellendi
+// CORS yapılandırması
 builder.Services.AddCors(options =>
 {
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.WithOrigins("http://localhost:3000") // Frontend'in çalışacağı port
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
-    });
+    options.AddDefaultPolicy(
+        builder =>
+        {
+            builder.WithOrigins("http://localhost:3000")
+                   .AllowAnyHeader()
+                   .AllowAnyMethod();
+        });
 });
 
 // JWT kimlik doğrulama yapılandırması
@@ -117,6 +133,7 @@ using (var scope = app.Services.CreateScope())
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
+    app.UseMigrationsEndPoint();
     app.UseSwagger();
     app.UseSwaggerUI(c => 
     {
@@ -128,6 +145,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 // Frontend statik dosyaları kaldırıldı
 app.UseRouting();
+
+// CORS middleware'ini UseRouting'den sonra ve UseAuthentication'dan önce kullan
 app.UseCors();
 
 app.UseAuthentication();
